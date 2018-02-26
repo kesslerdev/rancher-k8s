@@ -11,8 +11,8 @@ read domain
 
 EXT_IP=$(curl -s http://whatismyip.akamai.com/)
 
-echo define an DNS entry with:
-echo A $domain $EXT_IP
+echo "Define an DNS entry with:"
+echo "A $domain $EXT_IP"
 
 echo "WAIT for $domain points to $EXT_IP"
 
@@ -21,26 +21,32 @@ while [ "$(getent hosts $domain | grep $EXT_IP)" = "" ]; do \
 	sleep 10; \
 done;
 
-echo setup letsencrypt
+echo "Setup let\'s encrypt certificate for $domain"
+
+echo "Install certbot-auto"
 
 wget https://dl.eff.org/certbot-auto
 chmod a+x certbot-auto
 ./certbot-auto -n
 
+echo "Issuing a certificate for $domain"
 ./certbot-auto certonly -n --standalone --agree-tos -m $email -d $domain
 
-echo Write nginx conf
+echo "Write nginx conf"
 sed -e "s/<SERVER_NAME>/$domain/g" $curdir/../templates/nginx.conf | sed "s/<DOMAIN>/$domain/g" > /etc/nginx.conf
 
-echo Starting rancher
-docker run -d --name=rancher-server --restart=unless-stopped rancher/server:stable
+echo "Starting rancher"
+docker run -d --name=rancher-server \
+    --restart=unless-stopped \
+    rancher/server:stable
 
-echo Starting nginx
-docker run -d --name=nginx --restart=unless-stopped \
+echo "Starting nginx"
+docker run -d --name=nginx \
+    --restart=unless-stopped \
+    --link=rancher-server \
     -p 80:80 -p 443:443 \
     -v /etc/letsencrypt:/etc/letsencrypt \
     -v /etc/nginx.conf:/etc/nginx/conf.d/default.conf \
-    --link=rancher-server \
     nginx:1.11
 
 echo "Rancher > https://$domain" 
